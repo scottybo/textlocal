@@ -1,4 +1,6 @@
 <?php
+namespace App\TextLocal;
+use Illuminate\Contracts\Config\Repository;
 
 /**
  * Textlocal API2 Wrapper Class
@@ -10,25 +12,18 @@
  * @subpackage API
  * @author     Andy Dixon <andy.dixon@tetxlocal.com>
  * @version    1.4-UK
- * @const      REQUEST_URL       URL to make the request to
  * @const      REQUEST_TIMEOUT   Timeout in seconds for the HTTP request
  * @const      REQUEST_HANDLER   Handler to use when making the HTTP request (for future use)
  */
-class Textlocal
+class TextLocal
 {
-    const REQUEST_URL = 'https://api.txtlocal.com/';
 	const REQUEST_TIMEOUT = 60;
 	const REQUEST_HANDLER = 'curl';
 
-	private $username;
-	private $hash;
-	private $apiKey;
-
-	private $errorReporting = false;
+	private $config;
 
 	public $errors = array();
 	public $warnings = array();
-
 	public $lastRequest = array();
 
 	/**
@@ -36,14 +31,9 @@ class Textlocal
 	 * @param $username
 	 * @param $hash
 	 */
-	function __construct($username, $hash, $apiKey = false)
+	function __construct(Repository $config)
 	{
-		$this->username = $username;
-		$this->hash = $hash;
-		if ($apiKey) {
-			$this->apiKey = $apiKey;
-		}
-
+            $this->config = $config;
 	}
 
 	/**
@@ -56,14 +46,13 @@ class Textlocal
 	 */
 	private function _sendRequest($command, $params = array())
 	{
-		if ($this->apiKey && !empty($this->apiKey)) {
-			$params['apiKey'] = $this->apiKey;
-
+		if ($this->config['apiKey'] && !empty($this->config['apiKey'])) {
+			$params['apiKey'] = $this->config['apiKey'];
 		} else {
-			$params['hash'] = $this->hash;
+			$params['hash'] = $this->config['hash'];
 		}
 		// Create request string
-		$params['username'] = $this->username;
+		$params['username'] = $this->config['username'];
 
 		$this->lastRequest = $params;
 
@@ -71,17 +60,17 @@ class Textlocal
 			$rawResponse = $this->_sendRequestCurl($command, $params);
 		else throw new Exception('Invalid request handler.');
         
-        $result = json_decode($rawResponse);
-		if (isset($result->errors)) {
-			if (count($result->errors) > 0) {
-				foreach ($result->errors as $error) {
-					switch ($error->code) {
-						default:
-							throw new Exception($error->message);
-					}
-				}
-			}
-		}
+                $result = json_decode($rawResponse);
+                        if (isset($result->errors)) {
+                                if (count($result->errors) > 0) {
+                                        foreach ($result->errors as $error) {
+                                                switch ($error->code) {
+                                                        default:
+                                                                throw new Exception($error->message);
+                                                }
+                                        }
+                                }
+                        }
 
 		return $result;
 	}
@@ -96,7 +85,7 @@ class Textlocal
 	private function _sendRequestCurl($command, $params)
 	{
 
-		$url = self::REQUEST_URL . $command . '/';
+		$url = $this->config['url'] . $command . '/';
 
 		// Initialize handle
 		$ch = curl_init($url);
