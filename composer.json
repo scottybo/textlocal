@@ -1,0 +1,8 @@
+{
+    "name": "scottybo/textlocal-uk",
+    "autoload": {
+        "psr-0" : {
+            "Scottybo\\TextLocalUK" : "src"
+        }
+    }
+}
