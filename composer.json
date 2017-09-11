@@ -1,6 +1,7 @@
 {
     "name": "scottybo/textlocal-uk",
     "description": "Textlocal PHP Class for the UK",
+    "license": "MIT",
     "require": {
         "php": "^5.3.3 || ^7.0"
     },
