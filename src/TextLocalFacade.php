@@ -13,6 +13,6 @@ class TextLocalFacade extends Facade
      */
     protected static function getFacadeAccessor()
     {
-        return 'TextLocal';
+        return 'textlocal';
     }
 }
