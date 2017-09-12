@@ -67,7 +67,7 @@ class TextLocal
                         throw new TextLocalException('TextLocal API returned an error: '. $error->message);
                     }
                 }
-            }          
+            }
 
             return $body;
 	}
@@ -469,10 +469,10 @@ class TextLocal
 	 * @param $inbox
 	 * @return array|bool|mixed
 	 */
-	public function getMessages($inbox)
+	public function getMessages($inbox,$start, $limit, $min_time,$max_time)
 	{
-		if (!isset($inbox)) return false;
-		$options = array('inbox_id' => $inbox);
+                if (!isset($inbox) || !isset($start) || !isset($limit) || !isset($min_time) || !isset($max_time)) return false;
+		$options = array('inbox_id' => $inbox, 'start' => $start, 'limit' => $limit, 'min_time' => $min_time, 'max_time' => $max_time);
 		return $this->_sendRequest('get_messages', $options);
 	}
 
