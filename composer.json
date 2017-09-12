@@ -22,16 +22,16 @@
     },
     "autoload": {
         "psr-4" : {
-            "App\\TextLocal\\TextLocal\\" : "src"
+            "App\\TextLocalApi\\" : "src"
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                "App\\TextLocal\\TextLocalServiceProvider"
+                "App\\TextLocalApi\\TextLocalServiceProvider"
             ],
             "aliases": {
-                "TextLocal": "App\\TextLocal\\TextLocalFacade"
+                "TextLocal": "App\\TextLocalApi\\TextLocalFacade"
             }
         }
     }

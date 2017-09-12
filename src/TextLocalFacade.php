@@ -1,5 +1,5 @@
 <?php
-namespace App\TextLocal;
+namespace App\TextLocalApi;
 use Illuminate\Support\Facades\Facade;
 /**
  * @see App\TextLocal\TextLocalClass
@@ -13,6 +13,6 @@ class TextLocalFacade extends Facade
      */
     protected static function getFacadeAccessor()
     {
-        return 'textlocal';
+        return 'TextLocal';
     }
 }

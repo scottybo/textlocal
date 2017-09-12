@@ -1,5 +1,5 @@
 <?php
-namespace App\TextLocal;
+namespace App\TextLocalApi;
 use Illuminate\Contracts\Config\Repository;
 
 /**

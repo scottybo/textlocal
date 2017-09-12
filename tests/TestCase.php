@@ -1,7 +1,7 @@
 <?php
-namespace App\TextLocal\Test;
+namespace App\TextLocalApi\Test;
 use Orchestra\Testbench\TestCase as Orchestra;
-use App\TextLocal\TextLocalFacade;
+use App\TextLocalApi\TextLocalFacade;
 
 abstract class TestCase extends Orchestra
 {
