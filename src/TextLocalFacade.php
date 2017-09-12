@@ -2,7 +2,7 @@
 namespace App\TextLocalApi;
 use Illuminate\Support\Facades\Facade;
 /**
- * @see App\TextLocal\TextLocalClass
+ * @see App\TextLocalApi\TextLocal
  */
 class TextLocalFacade extends Facade
 {

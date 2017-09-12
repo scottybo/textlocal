@@ -9,7 +9,11 @@ class TextLocalServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-
+        if ($this->app->runningInConsole()) {
+            $this->publishes([
+                __DIR__.'/../config/textlocal.php' => config_path('textlocal.php'),
+            ], 'config');
+        }
     }
     /**
      * Register the application services.
@@ -17,6 +21,6 @@ class TextLocalServiceProvider extends ServiceProvider
     public function register()
     {
         $this->mergeConfigFrom(__DIR__.'/../config/textlocal.php', 'textlocal');
-        $this->app->bind('textlocal', TextLocalClass::class);
+        $this->app->bind('textlocal', TextLocal::class);
     }
 }

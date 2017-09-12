@@ -1,24 +1,23 @@
 <?php
 namespace App\TextLocalApi;
 use Illuminate\Contracts\Config\Repository;
+use GuzzleHttp\Client;
 
 /**
  * Textlocal API2 Wrapper Class
  *
  * This class is used to interface with the Textlocal API2 to send messages, manage contacts, retrieve messages from
  * inboxes, track message delivery statuses, access history reports
+ * 
+ * Original code by Andy Dixon (andy.dixon@textlocal.com), modified to work with Laravel and Guzzle
  *
  * @package    Textlocal
  * @subpackage API
- * @author     Andy Dixon <andy.dixon@tetxlocal.com>
+ * @author     Scott Bowler <scott.bowler@dcsworldwide.net>
  * @version    1.4-UK
- * @const      REQUEST_TIMEOUT   Timeout in seconds for the HTTP request
- * @const      REQUEST_HANDLER   Handler to use when making the HTTP request (for future use)
  */
 class TextLocal
 {
-	const REQUEST_TIMEOUT = 60;
-	const REQUEST_HANDLER = 'curl';
 
 	private $config;
 
@@ -28,8 +27,6 @@ class TextLocal
 
 	/**
 	 * Instantiate the object
-	 * @param $username
-	 * @param $hash
 	 */
 	function __construct(Repository $config)
 	{
@@ -41,85 +38,38 @@ class TextLocal
 	 * @param       $command
 	 * @param array $params
 	 * @return array|mixed
-	 * @throws Exception
+	 * @throws TextLocalException
 	 * @todo Add additional request handlers - eg fopen, file_get_contacts
 	 */
 	private function _sendRequest($command, $params = array())
 	{
-		if ($this->config['apiKey'] && !empty($this->config['apiKey'])) {
-			$params['apiKey'] = $this->config['apiKey'];
-		} else {
-			$params['hash'] = $this->config['hash'];
-		}
-		// Create request string
-		$params['username'] = $this->config['username'];
+            if ($this->config->get('textlocal.key') && !empty($this->config->get('textlocal.key'))) {
+                $params['apiKey'] = $this->config->get('textlocal.key');
+            } else {
+                $params['hash'] = $this->config->get('textlocal.hash');
+            }
+            
+            // Create request string
+            $params['username'] = $this->config->get('textlocal.username');
 
-		$this->lastRequest = $params;
+            $this->lastRequest = $params;
 
-		if (self::REQUEST_HANDLER == 'curl')
-			$rawResponse = $this->_sendRequestCurl($command, $params);
-		else throw new Exception('Invalid request handler.');
-        
-                $result = json_decode($rawResponse);
-                        if (isset($result->errors)) {
-                                if (count($result->errors) > 0) {
-                                        foreach ($result->errors as $error) {
-                                                switch ($error->code) {
-                                                        default:
-                                                                throw new Exception($error->message);
-                                                }
-                                        }
-                                }
-                        }
+            $client = new Client(); //GuzzleHttp\Client
+            $result = $client->post($this->config->get('textlocal.url') . $command . '/', [
+                'form_params' => $params
+            ]);
 
-		return $result;
-	}
+            $body = json_decode($result->getBody());
 
-	/**
-	 * Curl request handler
-	 * @param $command
-	 * @param $params
-	 * @return mixed
-	 * @throws Exception
-	 */
-	private function _sendRequestCurl($command, $params)
-	{
+            if($body->status != 'success') {
+                if (isset($body->errors) && count($body->errors) > 0) {
+                    foreach ($body->errors as $error) {
+                        throw new TextLocalException('TextLocal API returned an error: '. $error->message);
+                    }
+                }
+            }          
 
-		$url = $this->config['url'] . $command . '/';
-
-		// Initialize handle
-		$ch = curl_init($url);
-		curl_setopt_array($ch, array(
-			CURLOPT_POST           => true,
-			CURLOPT_POSTFIELDS     => $params,
-			CURLOPT_RETURNTRANSFER => true,
-			CURLOPT_SSL_VERIFYPEER => false,
-			CURLOPT_TIMEOUT        => self::REQUEST_TIMEOUT
-		));
-
-		$rawResponse = curl_exec($ch);
-		$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-		$error = curl_error($ch);
-		curl_close($ch);
-
-		if ($rawResponse === false) {
-			throw new Exception('Failed to connect to the Textlocal service: ' . $error);
-		} elseif ($httpCode != 200) {
-			throw new Exception('Bad response from the Textlocal service: HTTP code ' . $httpCode);
-		}
-
-		return $rawResponse;
-	}
-
-	/**
-	 * fopen() request handler
-	 * @param $command
-	 * @param $params
-	 * @throws Exception
-	 */
-	private function _sendRequestFopen($command, $params)
-	{
-		throw new Exception('Unsupported transfer method');
+            return $body;
 	}
 
 	/**
@@ -143,34 +93,34 @@ class TextLocal
 	 * @param false $optouts
 	 * @param false $simpleReplyService
 	 * @return array|mixed
-	 * @throws Exception
+	 * @throws TextLocalException
 	 */
 
 	public function sendSms($numbers, $message, $sender, $sched = null, $test = false, $receiptURL = null, $custom = null, $optouts = false, $simpleReplyService = false)
 	{
 
-		if (!is_array($numbers))
-			throw new Exception('Invalid $numbers format. Must be an array');
-		if (empty($message))
-			throw new Exception('Empty message');
-		if (empty($sender))
-			throw new Exception('Empty sender name');
-		if (!is_null($sched) && !is_numeric($sched))
-			throw new Exception('Invalid date format. Use numeric epoch format');
+            if (!is_array($numbers))
+                    throw new TextLocalException('Invalid $numbers format. Must be an array');
+            if (empty($message))
+                    throw new TextLocalException('Empty message');
+            if (empty($sender))
+                    throw new TextLocalException('Empty sender name');
+            if (!is_null($sched) && !is_numeric($sched))
+                    throw new TextLocalException('Invalid date format. Use numeric epoch format');
 
-		$params = array(
-			'message'       => rawurlencode($message),
-			'numbers'       => implode(',', $numbers),
-			'sender'        => rawurlencode($sender),
-			'schedule_time' => $sched,
-			'test'          => $test,
-			'receipt_url'   => $receiptURL,
-			'custom'        => $custom,
-			'optouts'       => $optouts,
-			'simple_reply'  => $simpleReplyService
-		);
+            $params = array(
+                    'message'       => rawurlencode($message),
+                    'numbers'       => implode(',', $numbers),
+                    'sender'        => rawurlencode($sender),
+                    'schedule_time' => $sched,
+                    'test'          => $test,
+                    'receipt_url'   => $receiptURL,
+                    'custom'        => $custom,
+                    'optouts'       => $optouts,
+                    'simple_reply'  => $simpleReplyService
+            );
 
-		return $this->_sendRequest('send', $params);
+            return $this->_sendRequest('send', $params);
 	}
 
 
@@ -185,19 +135,19 @@ class TextLocal
 	 * @param false $optouts
 	 * @param false $simpleReplyService
 	 * @return array|mixed
-	 * @throws Exception
+	 * @throws TextLocalException
 	 */
 	public function sendSmsGroup($groupId, $message, $sender = null, $sched = null, $test = false, $receiptURL = null, $custom = null, $optouts = false, $simpleReplyService = false)
 	{
 
 		if (!is_numeric($groupId))
-			throw new Exception('Invalid $groupId format. Must be a numeric group ID');
+			throw new TextLocalException('Invalid $groupId format. Must be a numeric group ID');
 		if (empty($message))
-			throw new Exception('Empty message');
+			throw new TextLocalException('Empty message');
 		if (empty($sender))
-			throw new Exception('Empty sender name');
+			throw new TextLocalException('Empty sender name');
 		if (!is_null($sched) && !is_numeric($sched))
-			throw new Exception('Invalid date format. Use numeric epoch format');
+			throw new TextLocalException('Invalid date format. Use numeric epoch format');
 
 		$params = array(
 			'message'       => rawurlencode($message),
@@ -249,19 +199,19 @@ class TextLocal
 	 * @param false $test
 	 * @param false $optouts
 	 * @return array|mixed
-	 * @throws Exception
+	 * @throws TextLocalException
 	 */
 	public function sendMms($numbers, $fileSource, $message, $sched = null, $test = false, $optouts = false)
 	{
 
 		if (!is_array($numbers))
-			throw new Exception('Invalid $numbers format. Must be an array');
+			throw new TextLocalException('Invalid $numbers format. Must be an array');
 		if (empty($message))
-			throw new Exception('Empty message');
+			throw new TextLocalException('Empty message');
 		if (empty($fileSource))
-			throw new Exception('Empty file source');
+			throw new TextLocalException('Empty file source');
 		if (!is_null($sched) && !is_numeric($sched))
-			throw new Exception('Invalid date format. Use numeric epoch format');
+			throw new TextLocalException('Invalid date format. Use numeric epoch format');
 
 		$params = array(
 			'message'       => rawurlencode($message),
@@ -288,19 +238,19 @@ class TextLocal
 	 * @param false $test
 	 * @param false $optouts
 	 * @return array|mixed
-	 * @throws Exception
+	 * @throws TextLocalException
 	 */
 	public function sendMmsGroup($groupId, $fileSource, $message, $sched = null, $test = false, $optouts = false)
 	{
 
 		if (!is_numeric($groupId))
-			throw new Exception('Invalid $groupId format. Must be a numeric group ID');
+			throw new TextLocalException('Invalid $groupId format. Must be a numeric group ID');
 		if (empty($message))
-			throw new Exception('Empty message');
+			throw new TextLocalException('Empty message');
 		if (empty($fileSource))
-			throw new Exception('Empty file source');
+			throw new TextLocalException('Empty file source');
 		if (!is_null($sched) && !is_numeric($sched))
-			throw new Exception('Invalid date format. Use numeric epoch format');
+			throw new TextLocalException('Invalid date format. Use numeric epoch format');
 
 		$params = array(
 			'message'       => rawurlencode($message),
@@ -333,20 +283,20 @@ class TextLocal
 	 * @param $user - can be ID or Email
 	 * @param $credits
 	 * @return array|mixed
-	 * @throws Exception
+	 * @throws TextLocalException
 	 **/
 
 	public function transferCredits($user, $credits)
 	{
 
 		if (!is_numeric($credits))
-			throw new Exception('Invalid credits format');
+			throw new TextLocalException('Invalid credits format');
 		if (!is_numeric($user))
-			throw new Exception('Invalid user');
+			throw new TextLocalException('Invalid user');
 		if (empty($user))
-			throw new Exception('No user specified');
+			throw new TextLocalException('No user specified');
 		if (empty($credits))
-			throw new Exception('No credits specified');
+			throw new TextLocalException('No credits specified');
 
 		if (is_int($user)) {
 			$params = array(
@@ -398,17 +348,17 @@ class TextLocal
 	 * @param     $limit
 	 * @param int $startPos
 	 * @return array|mixed
-	 * @throws Exception
+	 * @throws TextLocalException
 	 */
 	public function getContacts($groupId, $limit, $startPos = 0)
 	{
 
 		if (!is_numeric($groupId))
-			throw new Exception('Invalid $groupId format. Must be a numeric group ID');
+			throw new TextLocalException('Invalid $groupId format. Must be a numeric group ID');
 		if (!is_numeric($startPos) || $startPos < 0)
-			throw new Exception('Invalid $startPos format. Must be a numeric start position, 0 or above');
+			throw new TextLocalException('Invalid $startPos format. Must be a numeric start position, 0 or above');
 		if (!is_numeric($limit) || $limit < 1)
-			throw new Exception('Invalid $limit format. Must be a numeric limit value, 1 or above');
+			throw new TextLocalException('Invalid $limit format. Must be a numeric limit value, 1 or above');
 
 		$params = array(
 			'group_id' => $groupId,
@@ -680,8 +630,6 @@ class TextLocal
 	}
 }
 
-;
-
 class Contact
 {
 	var $number;
@@ -712,47 +660,3 @@ class Contact
 		$this->custom3 = $custom3;
 	}
 }
-
-;
-
-/**
- * If the json_encode function does not exist, then create it..
- */
-
-if (!function_exists('json_encode')) {
-	function json_encode($a = false)
-	{
-		if (is_null($a)) return 'null';
-		if ($a === false) return 'false';
-		if ($a === true) return 'true';
-		if (is_scalar($a)) {
-			if (is_float($a)) {
-				// Always use "." for floats.
-				return floatval(str_replace(",", ".", strval($a)));
-			}
-
-			if (is_string($a)) {
-				static $jsonReplaces = array(array("\\", "/", "\n", "\t", "\r", "\b", "\f", '"'), array('\\\\', '\\/', '\\n', '\\t', '\\r', '\\b', '\\f', '\"'));
-				return '"' . str_replace($jsonReplaces[0], $jsonReplaces[1], $a) . '"';
-			} else
-				return $a;
-		}
-		$isList = true;
-		for ($i = 0, reset($a); $i < count($a); $i++, next($a)) {
-			if (key($a) !== $i) {
-				$isList = false;
-				break;
-			}
-		}
-		$result = array();
-		if ($isList) {
-			foreach ($a as $v) $result[] = json_encode($v);
-			return '[' . join(',', $result) . ']';
-		} else {
-			foreach ($a as $k => $v) $result[] = json_encode($k) . ':' . json_encode($v);
-			return '{' . join(',', $result) . '}';
-		}
-	}
-}
-
-
